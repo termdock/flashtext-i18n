@@ -39,6 +39,12 @@ result = kp.extract_keywords(text)
 pip install flashtext-i18n
 ```
 
+Or using [uv](https://github.com/astral-sh/uv):
+
+```bash
+uv pip install flashtext-i18n
+```
+
 Or install from GitHub:
 
 ```bash
