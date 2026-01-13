@@ -123,6 +123,12 @@ sentences = kp.extract_sentences(text)
 # Get keyword count
 print(len(kp))
 # 2
+
+# One keyword matching multiple Tags (New in v3.1.0)
+kp.add_keyword('Apple', ['Fruit', 'Tech'])
+keywords = kp.extract_keywords('I have an Apple')
+# ['Fruit', 'Tech']
+
 ```
 
 ## Performance
