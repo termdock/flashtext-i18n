@@ -111,6 +111,10 @@ new_text = kp.replace_keywords(text)
 # Extract sentences with keywords (New in v3.1.0)
 sentences = kp.extract_sentences(text)
 # [('I love Python and 機器學習', ['Python', 'Machine Learning'])]
+
+# Get keyword count
+print(len(kp))
+# 2
 ```
 
 ## Performance
