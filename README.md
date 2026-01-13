@@ -178,8 +178,8 @@ In v3.1.0, we introduced a **Trie-based optimization** for mixed-case support, e
 
 | Benchmark (1000 keywords, 3.7M chars) | Time |
 |-----------|-----------|
-| **FlashText (Case-Sensitive)** | **0.81s** |
-| **FlashText (Case-Insensitive)** | **0.83s** |
+| **FlashText (Case-Sensitive)** | **0.27s** |
+| **FlashText (Case-Insensitive)** | **0.29s** |
 | Regex (Compiled) | ~2.5s+ |
 
 (Tested on Apple Silicon)

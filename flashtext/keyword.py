@@ -5,69 +5,7 @@ import json
 import re
 
 
-class WordBoundarySet(set):
-    """
-    A set-like object that checks if a character is a word character or not.
-    It supports all alphanumeric unicode characters as word characters by default.
-    """
-    def __init__(self, initial_chars=None):
-        super(WordBoundarySet, self).__init__(initial_chars or [])
-        self.excluded_chars = set()
 
-    def __contains__(self, char):
-        # If explicitly excluded, it's not a word char (it's a boundary)
-        if char in self.excluded_chars:
-            return False
-        
-        # If in the explicit set (legacy behavior), it's a word char
-        if super(WordBoundarySet, self).__contains__(char):
-            return True
-            
-        # If it's a valid Unicode letter/number, it's a word char
-        # BUT for CJK scripts (Chinese, Japanese, Korean), characters are self-delimited
-        # and should strictly be treated as boundaries for the algorithm to work.
-        if char.isalnum():
-            # Check for CJK ranges
-            # CJK Unified Ideographs: 4E00-9FFF
-            # Hiragana: 3040-309F
-            # Katakana: 30A0-30FF
-            # Hangul: AC00-D7AF
-            # CJK Extensions: 3400-4DBF, 20000-2A6DF, etc. (Simplification: check common ranges)
-            code = ord(char)
-            if (0x4E00 <= code <= 0x9FFF or  # CJK Unified
-                0x3400 <= code <= 0x4DBF or  # CJK Ext A
-                0x3040 <= code <= 0x309F or  # Hiragana
-                0x30A0 <= code <= 0x30FF or  # Katakana
-                0xAC00 <= code <= 0xD7AF):   # Hangul Syllables
-                return False
-            return True
-            
-        return False
-
-    def add(self, element):
-        """Add a character to the set of word characters (make it NOT a boundary)"""
-        self.excluded_chars.discard(element)
-        super(WordBoundarySet, self).add(element)
-
-    def remove(self, element):
-        """Remove a character from word characters (make it a boundary)"""
-        # If it's alphanumeric but not in the set, we just add to excluded
-        if self.__contains__(element): # check if it effectively exists
-             self.excluded_chars.add(element)
-             super(WordBoundarySet, self).discard(element)
-        else:
-             raise KeyError(element)
-
-    def discard(self, element):
-        """Remove a character from word characters if present (make it a boundary)"""
-        if self.__contains__(element):
-            self.excluded_chars.add(element)
-            super(WordBoundarySet, self).discard(element)
-
-    def copy(self):
-        new_set = WordBoundarySet(self)
-        new_set.excluded_chars = self.excluded_chars.copy()
-        return new_set
 
 
 class KeywordProcessor(object):
@@ -112,10 +50,10 @@ class KeywordProcessor(object):
         self._white_space_chars = set(['.', '\t', '\n', '\a', ' ', ','])
         try:
             # python 2.x
-            self.non_word_boundaries = WordBoundarySet(string.digits + string.letters + '_')
+            self.non_word_boundaries = set(string.digits + string.letters + '_')
         except AttributeError:
             # python 3.x
-            self.non_word_boundaries = WordBoundarySet(string.digits + string.ascii_letters + '_')
+            self.non_word_boundaries = set(string.digits + string.ascii_letters + '_')
         self.keyword_trie_dict = dict()
         self.case_sensitive = case_sensitive
         self._terms_in_trie = 0
@@ -643,13 +581,20 @@ class KeywordProcessor(object):
         # Note: Do NOT convert entire sentence to lowercase here.
         # Unicode chars like Turkish İ change length when lowercased (İ -> i̇).
         # Instead, we lowercase each character individually to preserve span positions.
-        current_dict = self.keyword_trie_dict
+        
+        # Performance: Localize member variables to avoid lookup overhead in loop
+        keyword_trie_dict = self.keyword_trie_dict
+        keyword_key = self._keyword
+        non_word_boundaries = self.non_word_boundaries
+        
+        current_dict = keyword_trie_dict
         sequence_start_pos = 0
         sequence_end_pos = 0
         reset_current_dict = False
         idx = 0
         sentence_len = len(sentence)
         curr_cost = max_cost
+        
         while idx < sentence_len:
             char = sentence[idx]
             # Optimization: We do NOT call lower() here anymore.
@@ -658,16 +603,16 @@ class KeywordProcessor(object):
             #     char = char.lower()
             # when we reach a character that might denote word end
             longest_sequence_found = None
-            if char not in self.non_word_boundaries:
+            if char not in non_word_boundaries:
 
                 # if end is present in current_dict
-                if self._keyword in current_dict or char in current_dict:
+                if keyword_key in current_dict or char in current_dict:
                     # update longest sequence found
                     sequence_found = None
                     is_longer_seq_found = False
-                    if self._keyword in current_dict:
-                        sequence_found = current_dict[self._keyword]
-                        longest_sequence_found = current_dict[self._keyword]
+                    if keyword_key in current_dict:
+                        sequence_found = current_dict[keyword_key]
+                        longest_sequence_found = current_dict[keyword_key]
                         sequence_end_pos = idx
 
                     # re look for longest_sequence from this position
@@ -679,14 +624,14 @@ class KeywordProcessor(object):
                             inner_char = sentence[idy]
                             # if not self.case_sensitive:
                             #     inner_char = inner_char.lower()
-                            if self._keyword in current_dict_continued:
+                            if keyword_key in current_dict_continued:
                                 # Check if we should accept this match:
                                 # 1. If next char is a word boundary (not in non_word_boundaries), OR
                                 # 2. If last matched char is CJK (not in non_word_boundaries) - CJK doesn't need word boundaries
                                 last_matched_char = sentence[idy - 1] if idy > 0 else ''
-                                if inner_char not in self.non_word_boundaries or last_matched_char not in self.non_word_boundaries:
+                                if inner_char not in non_word_boundaries or last_matched_char not in non_word_boundaries:
                                     # update longest sequence found
-                                    longest_sequence_found = current_dict_continued[self._keyword]
+                                    longest_sequence_found = current_dict_continued[keyword_key]
                                     sequence_end_pos = idy
                                     is_longer_seq_found = True
                             if inner_char in current_dict_continued:
@@ -706,25 +651,34 @@ class KeywordProcessor(object):
                             idy += 1
                         else:
                             # end of sentence reached.
-                            if self._keyword in current_dict_continued:
+                            if keyword_key in current_dict_continued:
                                 # update longest sequence found
-                                longest_sequence_found = current_dict_continued[self._keyword]
+                                longest_sequence_found = current_dict_continued[keyword_key]
                                 sequence_end_pos = idy
                                 is_longer_seq_found = True
                         if is_longer_seq_found:
                             idx = sequence_end_pos
-                    current_dict = self.keyword_trie_dict
+                    current_dict = keyword_trie_dict
                     if longest_sequence_found:
-                        if isinstance(longest_sequence_found, list):
-                            for key in longest_sequence_found:
-                                keywords_extracted.append((key, sequence_start_pos, idx))
+                        # Optimize: if not span_info, append only keyword
+                        if span_info:
+                            if isinstance(longest_sequence_found, list):
+                                for key in longest_sequence_found:
+                                    keywords_extracted.append((key, sequence_start_pos, idx))
+                            else:
+                                keywords_extracted.append((longest_sequence_found, sequence_start_pos, idx))
                         else:
-                            keywords_extracted.append((longest_sequence_found, sequence_start_pos, idx))
+                            if isinstance(longest_sequence_found, list):
+                                for key in longest_sequence_found:
+                                    keywords_extracted.append(key)
+                            else:
+                                keywords_extracted.append(longest_sequence_found)
+                                
                         curr_cost = max_cost
                     reset_current_dict = True
                 else:
                     # we reset current_dict
-                    current_dict = self.keyword_trie_dict
+                    current_dict = keyword_trie_dict
                     reset_current_dict = True
             elif char in current_dict:
                 # we can continue from this char (char is already lowercased if needed)
@@ -733,13 +687,13 @@ class KeywordProcessor(object):
                 next_word = self.get_next_word(sentence[idx:])
                 current_dict, cost, _ = next(
                     self.levensthein(next_word, max_cost=curr_cost, start_node=current_dict),
-                    (self.keyword_trie_dict, 0, 0)
+                    (keyword_trie_dict, 0, 0)
                 )
                 curr_cost -= cost
                 idx += len(next_word) - 1
             else:
                 # we reset current_dict
-                current_dict = self.keyword_trie_dict
+                current_dict = keyword_trie_dict
                 reset_current_dict = True
                 # skip to end of word
                 idy = idx + 1
@@ -747,7 +701,7 @@ class KeywordProcessor(object):
                     skip_char = sentence[idy]
                     # if not self.case_sensitive:
                     #     skip_char = skip_char.lower()
-                    if skip_char not in self.non_word_boundaries:
+                    if skip_char not in non_word_boundaries:
                         break
                     idy += 1
                 # Note: idy points to the first non-boundary char (or end of sentence)
@@ -756,13 +710,20 @@ class KeywordProcessor(object):
                 idx = idy - 1
             # if we are end of sentence and have a sequence discovered
             if idx + 1 >= sentence_len:
-                if self._keyword in current_dict:
-                    sequence_found = current_dict[self._keyword]
-                    if isinstance(sequence_found, list):
-                        for key in sequence_found:
-                            keywords_extracted.append((key, sequence_start_pos, sentence_len))
+                if keyword_key in current_dict:
+                    sequence_found = current_dict[keyword_key]
+                    if span_info:
+                        if isinstance(sequence_found, list):
+                            for key in sequence_found:
+                                keywords_extracted.append((key, sequence_start_pos, sentence_len))
+                        else:
+                            keywords_extracted.append((sequence_found, sequence_start_pos, sentence_len))
                     else:
-                        keywords_extracted.append((sequence_found, sequence_start_pos, sentence_len))
+                        if isinstance(sequence_found, list):
+                            for key in sequence_found:
+                                keywords_extracted.append(key)
+                        else:
+                            keywords_extracted.append(sequence_found)
             idx += 1
             if reset_current_dict:
                 reset_current_dict = False
@@ -771,9 +732,7 @@ class KeywordProcessor(object):
                 if longest_sequence_found:
                     idx -= 1
                 sequence_start_pos = idx
-        if span_info:
-            return keywords_extracted
-        return [value[0] for value in keywords_extracted]
+        return keywords_extracted
 
     def replace_keywords(self, sentence, max_cost=0, span_info=False):
         """
