@@ -904,6 +904,16 @@ class KeywordProcessor(object):
         next_word = str()
         for char in sentence:
             if char not in self.non_word_boundaries:
+                # Check if it's CJK. If so, it's a single-char word/token.
+                code = ord(char)
+                if (0x4E00 <= code <= 0x9FFF or  # CJK Unified
+                    0x3400 <= code <= 0x4DBF or  # CJK Ext A
+                    0x3040 <= code <= 0x309F or  # Hiragana
+                    0x30A0 <= code <= 0x30FF or  # Katakana
+                    0xAC00 <= code <= 0xD7AF):   # Hangul Syllables
+                    if not next_word:
+                        return char
+                    break # If we have "abc", we stop at "機" -> return "abc"
                 break
             next_word += char
         return next_word

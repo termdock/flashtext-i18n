@@ -148,13 +148,41 @@ keywords_found = kp.extract_keywords('I like apple and BANANA.')
 
 > **Note:** For high performance, FlashText merges case-insensitive paths in the internal Trie. If a case-insensitive keyword overlaps with a case-sensitive keyword (e.g. Loose `us` vs Strict `US`), they share the same path. The last added keyword will determine the replacement value for shared matches.
 
+### Fuzzy Matching (Levenshtein Distance)
+
+FlashText supports fuzzy matching to handle typos in input text. Use `max_cost` to specify the maximum allowable Levenshtein distance.
+
+```python
+kp = KeywordProcessor()
+kp.add_keyword('Machine Learning')
+
+# Exact match
+kp.extract_keywords('I love Machine Learning')
+# ['Machine Learning']
+
+# Fuzzy match (max_cost=2) -> Matches "Mchine Larning" (2 deletions)
+kp.extract_keywords('I love Mchine Larning', max_cost=2)
+# ['Machine Learning']
+
+# Fuzzy match for CJK (New in v3.1.0)
+kp.add_keyword('人工智慧')
+# Matches "人工智障" (1 substitution)
+kp.extract_keywords('這有人工智障功能', max_cost=1)
+# ['人工智慧']
+```
+
 ## Performance
 
-FlashText uses the Aho-Corasick algorithm with O(n) time complexity, making it extremely fast for keyword extraction from large texts.
+FlashText uses the Aho-Corasick algorithm with O(n) time complexity, making it extremely fast.
+In v3.1.0, we introduced a **Trie-based optimization** for mixed-case support, eliminating runtime overhead for case-insensitive matching.
 
-| Benchmark | FlashText | Regex |
-|-----------|-----------|-------|
-| 1000 keywords, 1M chars | ~0.1s | ~10s+ |
+| Benchmark (1000 keywords, 3.7M chars) | Time |
+|-----------|-----------|
+| **FlashText (Case-Sensitive)** | **0.81s** |
+| **FlashText (Case-Insensitive)** | **0.83s** |
+| Regex (Compiled) | ~2.5s+ |
+
+(Tested on Apple Silicon)
 
 ## Roadmap
 
