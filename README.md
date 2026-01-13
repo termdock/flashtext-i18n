@@ -49,6 +49,18 @@ text = '推薦雅詩蘭黛小棕瓶超好用'
 result = kp.extract_keywords(text)
 # Original FlashText: ['雅詩蘭黛']  ❌ Missing '小棕瓶'
 # FlashText i18n:     ['雅詩蘭黛', '小棕瓶']  ✅ Both extracted!
+### Loading Keywords from File (New in v3.1.0-dev)
+
+You can now load keywords directly from JSON or text files.
+
+```python
+# keywords.json
+# {
+#    "Color": ["red", "blue", "green"],
+#    "Vehicle": ["car", "bike"]
+# }
+
+kp.add_keyword_from_file('keywords.json')
 ```
 
 ## Installation
@@ -111,8 +123,9 @@ See [Issues](https://github.com/termdock/flashtext-i18n/issues) for planned fixe
 
 - [x] Unicode case folding span fix (Turkish İ, German ß) (Fixed in v3.0.0)
 - [x] Keywords followed by numbers extraction (Fixed in v3.0.0)
-- [x] Internationalized word boundary detection (Fixed in v3.0.0)
-- [ ] Indian languages (Devanagari) support
+- [x] Internationalized word boundary detection (Fixed in v3.1.0)
+- [x] Indian languages (Devanagari) support (Fixed in v3.1.0)
+- [x] Load keywords from JSON/Text file (Fixed in v3.1.0)
 
 ## Credits
 
