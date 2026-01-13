@@ -18,6 +18,24 @@ This fork aims to fix these issues while maintaining full API compatibility.
 
 ## Fixed in v3.0.0
 
+### International Word Boundaries (New in v3.1.0-dev)
+
+The original FlashText only supported ASCII characters (`A-Za-z0-9_`) as word parts. This caused issues for many languages where characters like `é`, `ß`, or `ç` were treated as delimiters, breaking words apart.
+
+**Fixed in v3.1.0**: All valid Unicode alphanumeric characters are now treated as part of a word by default.
+
+```python
+# Hindi (Devanagari)
+kp.add_keyword('नमस्ते')
+kp.extract_keywords('नमस्ते दुनिया') 
+# ✅ ['नमस्ते'] (Previously failed)
+
+# French/German
+kp.add_keyword('café')
+kp.extract_keywords('I went to a café.') 
+# ✅ ['café'] (Previously extracted 'caf')
+```
+
 ### CJK Adjacent Keywords
 
 ```python
