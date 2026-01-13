@@ -1,6 +1,7 @@
 import os
 import string
 import io
+import json
 
 
 class WordBoundarySet(set):
@@ -374,22 +375,41 @@ class KeywordProcessor(object):
             >>> # python
             >>> # c++
 
+            >>> # Option 3: keywords.json content
+            >>> # {"java": ["java_2e", "java programing"], "product management": ["PM"]}
+
             >>> keyword_processor.add_keyword_from_file('keywords.txt')
 
         Raises:
             IOError: If `keyword_file` path is not valid
-
         """
         if not os.path.isfile(keyword_file):
             raise IOError("Invalid file path {}".format(keyword_file))
-        with io.open(keyword_file, encoding=encoding) as f:
-            for line in f:
-                if '=>' in line:
-                    keyword, clean_name = line.split('=>')
-                    self.add_keyword(keyword, clean_name.strip())
+
+        if keyword_file.endswith(".json"):
+            with io.open(keyword_file, encoding=encoding) as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    for key, value in data.items():
+                        if isinstance(value, list):
+                            # {clean_name: [keywords]}
+                            for keyword in value:
+                                self.add_keyword(keyword, key)
+                        else:
+                            # {keyword: clean_name}
+                            self.add_keyword(key, value)
                 else:
-                    keyword = line.strip()
-                    self.add_keyword(keyword)
+                    raise ValueError("JSON must be a dictionary")
+        else:
+            with io.open(keyword_file, encoding=encoding) as f:
+                for line in f:
+                    if '=>' in line:
+                        keyword, clean_name = line.split('=>')
+                        self.add_keyword(keyword, clean_name.strip())
+                    else:
+                        keyword = line.strip()
+                        if keyword:
+                            self.add_keyword(keyword)
 
     def add_keywords_from_dict(self, keyword_dict):
         """To add keywords from a dictionary
@@ -414,6 +434,8 @@ class KeywordProcessor(object):
 
             for keyword in keywords:
                 self.add_keyword(keyword, clean_name)
+
+
 
     def remove_keywords_from_dict(self, keyword_dict):
         """To remove keywords from a dictionary
