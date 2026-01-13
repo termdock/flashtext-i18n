@@ -15,8 +15,8 @@ class PyTest(Command):
         errno = subprocess.call(['py.test'])
         raise SystemExit(errno)
 
-name = 'flashtext'
-version = '2.7'
+name = 'flashtext-cjk'
+version = '2.8.0'
 
 cmdclass = {'test': PyTest}
 
@@ -29,24 +29,32 @@ except ImportError:
 setup(
     name=name,
     version=version,
-    url='http://github.com/vi3k6i5/flashtext',
-    author='Vikash Singh',
-    author_email='vikash.duliajan@gmail.com',
-    description='Extract/Replaces keywords in sentences.',
-    long_description=open('README.rst').read(),
+    url='https://github.com/termdock/flashtext-cjk',
+    author='termdock',
+    author_email='termdock@users.noreply.github.com',
+    description='Extract/Replace keywords in sentences. Fork with CJK language fixes.',
+    long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
     packages=['flashtext'],
     install_requires=[],
     platforms='any',
     cmdclass=cmdclass,
     classifiers=[
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Operating System :: OS Independent',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
+        'Natural Language :: Chinese (Simplified)',
+        'Natural Language :: Chinese (Traditional)',
+        'Natural Language :: Japanese',
+        'Natural Language :: Korean',
     ],
+    python_requires='>=3.8',
     command_options={
         'build_sphinx': {
             'project': ('setup.py', name),
