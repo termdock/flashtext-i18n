@@ -129,7 +129,24 @@ kp.add_keyword('Apple', ['Fruit', 'Tech'])
 keywords = kp.extract_keywords('I have an Apple')
 # ['Fruit', 'Tech']
 
+# Mixed Case Support (Case-Sensitive & Case-Insensitive) (New in v3.1.0)
+# Default: case_sensitive=False (Global)
+kp = KeywordProcessor()
+
+# Add a case-insensitive keyword (matches 'banana', 'Banana', 'BANANA')
+kp.add_keyword('banana')
+
+# Add a case-sensitive keyword (matches 'Apple' ONLY)
+kp.add_keyword('Apple', case_sensitive=True)
+
+keywords_found = kp.extract_keywords('I like Apple and Banana.')
+# ['Apple', 'banana']
+
+keywords_found = kp.extract_keywords('I like apple and BANANA.')
+# ['banana'] (Strict 'Apple' does not match 'apple')
 ```
+
+> **Note:** For high performance, FlashText merges case-insensitive paths in the internal Trie. If a case-insensitive keyword overlaps with a case-sensitive keyword (e.g. Loose `us` vs Strict `US`), they share the same path. The last added keyword will determine the replacement value for shared matches.
 
 ## Performance
 

@@ -147,8 +147,8 @@ class KeywordProcessor(object):
             >>> # True
 
         """
-        if not self.case_sensitive:
-            word = word.lower()
+        # if not self.case_sensitive:
+        #     word = word.lower()
         current_dict = self.keyword_trie_dict
         len_covered = 0
         for char in word:
@@ -175,8 +175,8 @@ class KeywordProcessor(object):
             >>> keyword_processor['Big Apple']
             >>> # New York
         """
-        if not self.case_sensitive:
-            word = word.lower()
+        # if not self.case_sensitive:
+        #     word = word.lower()
         current_dict = self.keyword_trie_dict
         len_covered = 0
         for char in word:
@@ -203,19 +203,49 @@ class KeywordProcessor(object):
         Examples:
             >>> keyword_processor['Big Apple'] = 'New York'
         """
+        return self._add_keyword_to_trie(keyword, clean_name=clean_name)
+
+    def _add_keyword_to_trie(self, keyword, clean_name=None, case_sensitive=None):
+        """
+        Internal method to add keyword to trie.
+        If case_sensitive is None, uses self.case_sensitive.
+        If case_sensitive is False, adds edges for both lower and upper case chars.
+        """
         status = False
         if not clean_name and keyword:
             clean_name = keyword
 
         if keyword and clean_name:
-            if not self.case_sensitive:
-                keyword = keyword.lower()
+            if case_sensitive is None:
+                case_sensitive = self.case_sensitive
+            
+            # If case sensitive, we only add the exact path.
+            # If not case sensitive, we add paths for both cases sharing the same nodes.
+            
             current_dict = self.keyword_trie_dict
-            for letter in keyword:
-                current_dict = current_dict.setdefault(letter, {})
+            for char in keyword:
+                if case_sensitive:
+                    current_dict = current_dict.setdefault(char, {})
+                else:
+                    # Loose case: ensure we have a node for this step
+                    lower = char.lower()
+                    upper = char.upper()
+                    
+                    # Try to find existing node (shared)
+                    next_node = current_dict.get(lower) or current_dict.get(upper)
+                    if next_node is None:
+                        next_node = {}
+                    
+                    # Link both lower and upper to this node
+                    current_dict[lower] = next_node
+                    current_dict[upper] = next_node
+                    
+                    current_dict = next_node
+            
             if self._keyword not in current_dict:
                 status = True
                 self._terms_in_trie += 1
+            
             if isinstance(clean_name, list):
                  current_dict[self._keyword] = list(clean_name)
             else:
@@ -236,14 +266,14 @@ class KeywordProcessor(object):
         """
         status = False
         if keyword:
-            if not self.case_sensitive:
-                keyword = keyword.lower()
+            # Note: We do NOT lower the keyword even if case_sensitive is False.
+            # Because the Trie now contains edges for both cases.
             current_dict = self.keyword_trie_dict
             character_trie_list = []
             for letter in keyword:
                 if letter in current_dict:
                     character_trie_list.append((letter, current_dict))
-                    current_dict = current_dict[letter]
+                    current_dict = current_dict[letter] # This is safe
                 else:
                     # if character is not found, break out of the loop
                     current_dict = None
@@ -260,7 +290,26 @@ class KeywordProcessor(object):
                     else:
                         # more than one key means more than 1 path.
                         # Delete not required path and keep the other
+                        
+                        # Check for multi-edge (mixed case) redundancy
+                        # If we are removing 'a', check if 'A' points to the same object
+                        if isinstance(key_to_remove, str): # Verify it's not _keyword_
+                            lower = key_to_remove.lower()
+                            upper = key_to_remove.upper()
+                            other_key = upper if key_to_remove == lower else lower
+                            
+                            if other_key != key_to_remove and other_key in dict_pointer and key_to_remove in dict_pointer:
+                                if dict_pointer[other_key] is dict_pointer[key_to_remove]:
+                                    dict_pointer.pop(other_key)
+
                         dict_pointer.pop(key_to_remove)
+                        # After popping, check if dict became empty? 
+                        # If so, we should continue loop? 
+                        # Original logic breaks here. 
+                        # If we popped both edges, and dict is now empty (except maybe other keys?), 
+                        # we might want to continue bubbling up if it IS empty.
+                        if len(dict_pointer) == 0:
+                             continue # Continue bubbling up
                         break
                 # successfully removed keyword
                 status = True
@@ -292,7 +341,7 @@ class KeywordProcessor(object):
         """
         self.non_word_boundaries.add(character)
 
-    def add_keyword(self, keyword, clean_name=None):
+    def add_keyword(self, keyword, clean_name=None, case_sensitive=None):
         """To add one or more keywords to the dictionary
         pass the keyword and the clean name it maps to.
 
@@ -303,6 +352,11 @@ class KeywordProcessor(object):
             clean_name : string
                 clean term for that keyword that you would want to get back in return or replace
                 if not provided, keyword will be used as the clean name also.
+            
+            case_sensitive : boolean
+                If None, uses the global case_sensitive setting.
+                If True, adds the keyword as case-sensitive.
+                If False, adds the keyword as case-insensitive.
 
         Returns:
             status : bool
@@ -315,7 +369,7 @@ class KeywordProcessor(object):
             >>> keyword_processor.add_keyword('Big Apple')
             >>> # This case 'Big Apple' will return 'Big Apple'
         """
-        return self.__setitem__(keyword, clean_name)
+        return self._add_keyword_to_trie(keyword, clean_name=clean_name, case_sensitive=case_sensitive)
 
     def remove_keyword(self, keyword):
         """To remove one or more keywords from the dictionary
@@ -529,13 +583,33 @@ class KeywordProcessor(object):
             term_so_far = ''
         if current_dict is None:
             current_dict = self.keyword_trie_dict
+        if current_dict is None:
+            current_dict = self.keyword_trie_dict
+        
+        # Optimization: group keys pointing to the same child node object
+        # to avoid exponential traversal in Mixed Case Support (DAG Trie)
+        visited_children = {} # id(child_node) -> child_node
+        keys_for_child = {}   # id(child_node) -> set(keys) OR representative_key
+        
         for key in current_dict:
             if key == '_keyword_':
                 terms_present[term_so_far] = current_dict[key]
             else:
-                sub_values = self.get_all_keywords(term_so_far + key, current_dict[key])
-                for key in sub_values:
-                    terms_present[key] = sub_values[key]
+                child_node = current_dict[key]
+                child_id = id(child_node)
+                if child_id not in visited_children:
+                    visited_children[child_id] = child_node
+                    keys_for_child[child_id] = key # Pick first key as representative
+                # Else: we skip traversing this child again for other keys (e.g. 'A' vs 'a')
+        
+        for child_id, child_node in visited_children.items():
+            representative_key = keys_for_child[child_id]
+            # Use representative key to recurse. 
+            # Note: This means we only return one variation (e.g. 'apple' but not 'Apple')
+            # if they share the path. This mimics legacy case-insensitive behavior where keys were lowercased.
+            sub_values = self.get_all_keywords(term_so_far + representative_key, child_node)
+            for key in sub_values:
+                terms_present[key] = sub_values[key]
         return terms_present
 
     def extract_keywords(self, sentence, span_info=False, max_cost=0):
@@ -578,8 +652,10 @@ class KeywordProcessor(object):
         curr_cost = max_cost
         while idx < sentence_len:
             char = sentence[idx]
-            if not self.case_sensitive:
-                char = char.lower()
+            # Optimization: We do NOT call lower() here anymore.
+            # The Trie contains necessary edges for case-insensitive matching.
+            # if not self.case_sensitive:
+            #     char = char.lower()
             # when we reach a character that might denote word end
             longest_sequence_found = None
             if char not in self.non_word_boundaries:
@@ -601,8 +677,8 @@ class KeywordProcessor(object):
                         idy = idx + 1
                         while idy < sentence_len:
                             inner_char = sentence[idy]
-                            if not self.case_sensitive:
-                                inner_char = inner_char.lower()
+                            # if not self.case_sensitive:
+                            #     inner_char = inner_char.lower()
                             if self._keyword in current_dict_continued:
                                 # Check if we should accept this match:
                                 # 1. If next char is a word boundary (not in non_word_boundaries), OR
@@ -669,8 +745,8 @@ class KeywordProcessor(object):
                 idy = idx + 1
                 while idy < sentence_len:
                     skip_char = sentence[idy]
-                    if not self.case_sensitive:
-                        skip_char = skip_char.lower()
+                    # if not self.case_sensitive:
+                    #     skip_char = skip_char.lower()
                     if skip_char not in self.non_word_boundaries:
                         break
                     idy += 1
