@@ -58,3 +58,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - **Deployment Crash**: Fixed `Illegal Instruction` (BackOff restart) on Zeabur/generic Linux environments by enforcing generic x86-64 CPU target and enabling Zig cross-compilation for older glibc compatibility (`manylinux2014`).
+
+## v4.0.0a12 (2026-01-14)
+
+### Changed
+- **Build System**: Switched from `manylinux2014` (via Zig) to `manylinux_2_28` (glibc 2.28) using official Docker containers. This ensures better toolchain stability while maintaining compatibility with modern environments like Zeabur (glibc 2.41).
+- **Core**: Retained `target-cpu=x86-64` flag to prevent AVX/AVX2 instruction generation.
