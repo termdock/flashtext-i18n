@@ -17,8 +17,8 @@ jobs:
           # manylinux x86_64
           - id: manylinux-x86_64
             os: ubuntu-latest
-            target: x86_64
-            manylinux: auto
+            target: x86_64-unknown-linux-gnu
+            manylinux: 2014
             args: --release --out dist
 
           # manylinux aarch64 cross
