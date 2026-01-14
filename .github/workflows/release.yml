@@ -7,6 +7,28 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Dedicated job for manylinux x86_64 - runs INSIDE container
+  build-manylinux-x86_64:
+    name: Build manylinux x86_64 wheels
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux2014_x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
+        with:
+          command: build
+          args: --release --out dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-manylinux-x86_64
+          path: dist
+
+  # Other platforms (not x86_64 manylinux)
   build:
     name: Build wheels on ${{ matrix.id }}
     runs-on: ${{ matrix.os }}
@@ -14,12 +36,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # manylinux x86_64
-          - id: manylinux-x86_64
-            os: ubuntu-latest
-            manylinux: 2014
-            args: --release --out dist
-
           # manylinux aarch64 cross
           - id: manylinux-aarch64
             os: ubuntu-latest
@@ -38,14 +54,12 @@ jobs:
           - id: windows-x86_64
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            manylinux: auto
             args: --release --out dist
 
           # macOS universal2
           - id: macos-universal2
             os: macos-latest
             target: universal2-apple-darwin
-            manylinux: auto
             args: --release --out dist
 
     steps:
@@ -72,7 +86,7 @@ jobs:
   publish-testpypi:
     name: Publish to TestPyPI
     if: github.event_name == 'workflow_dispatch'
-    needs: build
+    needs: [build-manylinux-x86_64, build]
     runs-on: ubuntu-latest
     environment: testpypi
     permissions:
@@ -99,7 +113,7 @@ jobs:
   publish-pypi:
     name: Publish to PyPI
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build-manylinux-x86_64, build]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
