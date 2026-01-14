@@ -19,35 +19,35 @@ jobs:
             os: ubuntu-latest
             target: x86_64
             manylinux: auto
-            args: --release --out dist --find-interpreter
+            args: --release --out dist
 
           # manylinux aarch64 cross
           - id: manylinux-aarch64
             os: ubuntu-latest
             target: aarch64
             manylinux: auto
-            args: --release --out dist --find-interpreter
+            args: --release --out dist
 
           # musllinux x86_64
           - id: musllinux-x86_64
             os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             manylinux: musllinux_1_2
-            args: --release --out dist --find-interpreter
+            args: --release --out dist
 
           # Windows
           - id: windows-x86_64
             os: windows-latest
             target: x86_64-pc-windows-msvc
             manylinux: auto
-            args: --release --out dist --find-interpreter
+            args: --release --out dist
 
           # macOS universal2
           - id: macos-universal2
             os: macos-latest
             target: universal2-apple-darwin
             manylinux: auto
-            args: --release --out dist --find-interpreter
+            args: --release --out dist
 
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +57,8 @@ jobs:
           python-version: "3.11"
 
       - uses: PyO3/maturin-action@v1
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
         with:
           target: ${{ matrix.target }}
           command: build
@@ -73,6 +75,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
+    environment: testpypi
     permissions:
       id-token: write
 
@@ -99,6 +102,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
       id-token: write
 

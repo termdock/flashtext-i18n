@@ -111,4 +111,4 @@ how_to_test_setup_deploy.txt
 .tox
 
 claude.mdbenchmarks/data/
-.venv_verify/*
+.venv_verify/*Cargo.lock
